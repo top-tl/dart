@@ -1,0 +1,11 @@
+name: toptl
+description: Official Dart SDK for the TOP.TL Telegram Directory API.
+version: 1.0.0
+homepage: https://top.tl
+repository: https://github.com/top-tl/dart-sdk
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  http: ^1.1.0
