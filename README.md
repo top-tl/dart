@@ -1,111 +1,113 @@
-# TOP.TL Dart SDK
+# toptl
 
-[![pub package](https://img.shields.io/pub/v/toptl.svg)](https://pub.dev/packages/toptl)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![pub package](https://img.shields.io/pub/v/toptl.svg?color=3775a9)](https://pub.dev/packages/toptl)
+[![pub points](https://img.shields.io/pub/points/toptl?color=3776ab)](https://pub.dev/packages/toptl/score)
+[![Downloads](https://img.shields.io/pub/dm/toptl.svg?color=blue)](https://pub.dev/packages/toptl)
+[![License](https://img.shields.io/github/license/top-tl/dart.svg?color=green)](https://github.com/top-tl/dart/blob/main/LICENSE)
+[![TOP.TL](https://img.shields.io/badge/top.tl-developers-2ec4b6)](https://top.tl/developers)
 
-Official Dart SDK for the [TOP.TL](https://top.tl) Telegram Directory API.
+Official Dart SDK for **[TOP.TL](https://top.tl)** — post bot stats, check votes, and manage vote webhooks from your Telegram bot.
 
-## Installation
-
-Add to your `pubspec.yaml`:
+## Install
 
 ```yaml
 dependencies:
-  toptl: ^1.0.0
+  toptl: ^0.1.0
 ```
 
-Then run:
+Dart `>=3.0.0`.
 
-```bash
-dart pub get
-```
-
-## Quick Start
+## Quick start
 
 ```dart
 import 'package:toptl/toptl.dart';
 
-void main() async {
-  final client = TopTL('your-api-token');
+Future<void> main() async {
+  final client = TopTL('toptl_xxx');
 
-  // Get listing info
-  final listing = await client.getListing('mybot');
-  print(listing.title);
-  print(listing.memberCount);
+  // Look up a listing
+  final listing = await client.getListing('durov');
+  print('${listing.title} — ${listing.voteCount} votes');
 
-  // Get votes
-  final votes = await client.getVotes('mybot');
-  print(votes.votes);
-  print(votes.monthlyVotes);
+  // Post stats for a bot you own
+  await client.postStats(
+    'mybot',
+    memberCount: 5000,
+    groupCount: 1200,
+    channelCount: 300,
+  );
 
-  // Check if a user has voted
-  final voted = await client.hasVoted('mybot', 123456789);
-  print(voted ? 'Voted' : 'Not voted');
+  // Reward voters
+  final check = await client.hasVoted('mybot', 123456789);
+  if (check.voted) {
+    // grant premium …
+  }
 
-  // Post stats
-  await client.postStats('mybot', memberCount: 5000, groupCount: 120);
-
-  // Get global stats
-  final stats = await client.getStats();
-  print(stats.totalListings);
-
-  // Clean up
   client.close();
 }
 ```
 
 ## Autoposter
 
-Automatically post stats at regular intervals:
+For long-running bots:
 
 ```dart
-import 'package:toptl/toptl.dart';
+final poster = Autoposter(
+  client: client,
+  username: 'mybot',
+  statsCallback: () async => {
+    'memberCount': await getUserCount(),
+    'groupCount': await getGroupCount(),
+  },
+  interval: const Duration(minutes: 30),
+  onlyOnChange: true,
+)..start();
 
-void main() {
-  final client = TopTL('your-api-token');
+// poster.stop(); on shutdown
+```
 
-  final autoposter = Autoposter(
-    client: client,
-    username: 'mybot',
-    interval: Duration(minutes: 30),
-    statsCallback: () async {
-      return {
-        'memberCount': await getMyMemberCount(),
-        'groupCount': await getMyGroupCount(),
-      };
-    },
-  );
+## Webhooks
 
-  autoposter.onPost((result) => print('Stats posted successfully'));
-  autoposter.onError((error) => print('Error: $error'));
+```dart
+await client.setWebhook(
+  'mybot',
+  'https://mybot.example.com/toptl-vote',
+  rewardTitle: '30-day premium',
+);
 
-  // Start posting
-  autoposter.start();
+final result = await client.testWebhook('mybot');
+print(result.success);
+```
 
-  // Later, stop it
-  // autoposter.stop();
+## Batch stats
+
+Up to 25 listings per request:
+
+```dart
+await client.batchPostStats([
+  {'username': 'bot1', 'memberCount': 1200},
+  {'username': 'bot2', 'memberCount': 5400},
+]);
+```
+
+## Error handling
+
+Everything throws a subclass of `TopTLException`:
+
+```dart
+try {
+  await client.postStats('mybot', memberCount: 5000);
+} on AuthenticationException {
+  // bad token / missing scope
+} on NotFoundException {
+  // listing doesn't exist
+} on RateLimitException {
+  // back off and retry
+} on ValidationException catch (e) {
+  print(e.message); // server payload
 }
 ```
 
-For one-off posting:
-
-```dart
-await autoposter.postOnce();
-```
-
-## API Reference
-
-### `TopTL` Client
-
-| Method | Description |
-|--------|-------------|
-| `getListing(username)` | Get listing info |
-| `getVotes(username)` | Get votes for a listing |
-| `hasVoted(username, userId)` | Check if a user voted |
-| `postStats(username, {memberCount, groupCount})` | Post stats |
-| `getStats()` | Get global TOP.TL stats |
-| `close()` | Close the HTTP client |
-
 ## License
 
-MIT - see [LICENSE](LICENSE) for details.
+MIT.

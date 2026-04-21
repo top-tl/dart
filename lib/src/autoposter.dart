@@ -1,74 +1,93 @@
 import 'dart:async';
+
 import 'client.dart';
+import 'models.dart';
 
-/// A callback that returns the current stats to post.
-typedef StatsCallback = Future<Map<String, int>> Function();
+/// Callback that returns the current counters to post. The map may
+/// contain any of `memberCount`, `groupCount`, `channelCount`, and
+/// `botServes` (a `List<String>`).
+typedef StatsCallback = Future<Map<String, Object?>> Function();
 
-/// Automatically posts stats to TOP.TL at regular intervals.
+/// Background timer that calls [TopTL.postStats] on an interval.
+///
+///   final poster = Autoposter(
+///     client: client,
+///     username: 'mybot',
+///     statsCallback: () async => {'memberCount': await getUserCount()},
+///     interval: const Duration(minutes: 30),
+///     onlyOnChange: true,
+///   )..start();
 class Autoposter {
   final TopTL _client;
   final String _username;
   final Duration _interval;
-  final StatsCallback _statsCallback;
+  final StatsCallback _callback;
+  final bool _onlyOnChange;
 
   Timer? _timer;
-  void Function(Map<String, dynamic>)? _onPost;
-  void Function(Object error)? _onError;
+  Map<String, Object?>? _last;
+  void Function(StatsResult result)? onPost;
+  void Function(Object error)? onError;
 
-  /// Creates a new Autoposter.
-  ///
-  /// [client] is the TOP.TL client instance.
-  /// [username] is the listing username to post stats for.
-  /// [statsCallback] is an async function returning a map with optional keys:
-  /// `memberCount` and `groupCount`.
-  /// [interval] is the time between posts (default: 30 minutes).
   Autoposter({
     required TopTL client,
     required String username,
     required StatsCallback statsCallback,
     Duration interval = const Duration(minutes: 30),
+    bool onlyOnChange = true,
   })  : _client = client,
         _username = username,
-        _statsCallback = statsCallback,
-        _interval = interval;
+        _callback = statsCallback,
+        _interval = interval,
+        _onlyOnChange = onlyOnChange;
 
-  /// Set a callback for successful stat posts.
-  void onPost(void Function(Map<String, dynamic> result) callback) {
-    _onPost = callback;
-  }
-
-  /// Set a callback for errors.
-  void onError(void Function(Object error) callback) {
-    _onError = callback;
-  }
-
-  /// Start the autoposter. Posts immediately, then at [interval].
+  /// Start the autoposter. First flush happens on the first tick (not
+  /// immediately) so the app has a chance to collect data.
   void start() {
-    postOnce();
+    _timer?.cancel();
     _timer = Timer.periodic(_interval, (_) => postOnce());
   }
 
-  /// Stop the autoposter.
   void stop() {
     _timer?.cancel();
     _timer = null;
   }
 
-  /// Whether the autoposter is currently running.
   bool get isRunning => _timer?.isActive ?? false;
 
-  /// Post stats once (useful for manual invocation).
   Future<void> postOnce() async {
+    Map<String, Object?> stats;
     try {
-      final stats = await _statsCallback();
+      stats = await _callback();
+    } catch (e) {
+      onError?.call(e);
+      return;
+    }
+
+    if (_onlyOnChange && _mapEquals(stats, _last)) return;
+
+    try {
       final result = await _client.postStats(
         _username,
-        memberCount: stats['memberCount'],
-        groupCount: stats['groupCount'],
+        memberCount: stats['memberCount'] as int?,
+        groupCount: stats['groupCount'] as int?,
+        channelCount: stats['channelCount'] as int?,
+        botServes: (stats['botServes'] as List?)?.cast<String>(),
       );
-      _onPost?.call(result);
+      _last = Map.of(stats);
+      onPost?.call(result);
     } catch (e) {
-      _onError?.call(e);
+      onError?.call(e);
     }
+  }
+
+  bool _mapEquals(Map<String, Object?> a, Map<String, Object?>? b) {
+    if (b == null) return false;
+    if (a.length != b.length) return false;
+    for (final k in a.keys) {
+      if (!b.containsKey(k)) return false;
+      if (a[k]?.toString() != b[k]?.toString()) return false;
+    }
+    return true;
   }
 }

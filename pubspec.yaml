@@ -1,11 +1,25 @@
 name: toptl
-description: Official Dart SDK for the TOP.TL Telegram Directory API.
-version: 1.0.0
+description: >
+  Official Dart SDK for the TOP.TL Telegram directory API — post bot
+  stats, check votes, and manage vote webhooks.
+version: 0.1.0
 homepage: https://top.tl
-repository: https://github.com/top-tl/dart-sdk
+repository: https://github.com/top-tl/dart
+issue_tracker: https://github.com/top-tl/dart/issues
+documentation: https://top.tl/developers
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
 
+topics:
+  - telegram
+  - toptl
+  - bot
+  - directory
+
 dependencies:
   http: ^1.1.0
+
+dev_dependencies:
+  lints: ^3.0.0
+  test: ^1.25.0
